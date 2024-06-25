@@ -25,8 +25,8 @@ jobs:
     - name: Build the Docker image
       run: docker build -f Dockerfile . -t attestations-test:$(date +%s) -t ghcr.io/kalebpederson/attestations-test:2.4.0
 
-    #- name: Login to docker registry
-    #  run: echo "${{ secrets.GHCR_PACKAGES_WRITE }}" | docker login ghcr.io -u '<token>' --password-stdin
+    - name: Login to docker registry
+      run: echo "${{ secrets.GHCR_PACKAGES_WRITE }}" | docker login ghcr.io -u '<token>' --password-stdin
 
     - name: Push the Docker image
       run: docker push ghcr.io/kalebpederson/attestations-test:2.4.0
