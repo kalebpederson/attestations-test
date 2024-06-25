@@ -1,0 +1,49 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+      packages: write
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build the Docker image
+      run: docker build -f Dockerfile . -t attestations-test:$(date +%s) -t ghcr.io/kalebpederson/attestations-test:2.4.0
+
+    - name: Login to docker registry
+      run: echo "${{ secrets.GHCR_PACKAGES_WRITE }}" | docker login ghcr.io -u '<token>' --password-stdin
+
+    - name: Push the Docker image
+      run: docker push ghcr.io/kalebpederson/attestations-test:2.4.0
+
+    - name: Retrieve and store image SHA
+      run: |
+        IMAGE_SHA=$(docker image inspect ghcr.io/kalebpederson/attestations-test:2.4.0 | jq -r '.[].RepoDigests[0] | capture("@(?<sha>sha256:.*)") | .sha')
+        echo "IMAGE_SHA=$IMAGE_SHA" >> "$GITHUB_ENV"
+
+    # the attestation process does not seem to be capable of pushing to a registry that doesn't require authorization
+    # (yes, I know that's not typicaly, but I tried to use ttl.sh for testing and it failed with an error suggesting
+    # it was trying to retrieve credentials).
+    - name: Attest Build Provenance
+      uses: actions/attest-build-provenance@v1.1.1
+      with:
+        #subject-path: Dockerfile
+        subject-name: ghcr.io/kalebpederson/attestations-test
+        subject-digest: ${{ env.IMAGE_SHA }}
+        push-to-registry: true
+        # github-token: ${{ secrets.GHCR_PACKAGES_WRITE }} # A user PAT has to be granted org access for this to work
